@@ -2,13 +2,13 @@
 param(
     [Parameter(Position = 0, Mandatory, ParameterSetName = "Default")]
     [Parameter(Position = 0, Mandatory, ParameterSetName = "BurnInSubtitles")]
-    [Parameter(Position = 0, ParameterSetName = "DefaultTestConversion")]
-    [Parameter(Position = 0, ParameterSetName = "BurnInSubtitlesTestConversion")]
+    [Parameter(Position = 0, Mandatory, ParameterSetName = "DefaultTestConversion")]
+    [Parameter(Position = 0, Mandatory, ParameterSetName = "BurnInSubtitlesTestConversion")]
     [string[]]$VideoFile,
     [Parameter(Position = 1, Mandatory, ParameterSetName = "Default")]
     [Parameter(Position = 1, Mandatory, ParameterSetName = "BurnInSubtitles")]
-    [Parameter(Position = 1, ParameterSetName = "DefaultTestConversion")]
-    [Parameter(Position = 1, ParameterSetName = "BurnInSubtitlesTestConversion")]
+    [Parameter(Position = 1, Mandatory, ParameterSetName = "DefaultTestConversion")]
+    [Parameter(Position = 1, Mandatory, ParameterSetName = "BurnInSubtitlesTestConversion")]
     [string]$OutputDir,
     [Parameter(Position = 2, ParameterSetName = "Default")]
     [Parameter(Position = 2, ParameterSetName = "BurnInSubtitles")]
@@ -57,7 +57,7 @@ param(
     [Parameter(Position = 8, ParameterSetName = "DefaultTestConversion")]
     [Parameter(Position = 9, ParameterSetName = "BurnInSubtitlesTestConversion")]
     [timespan]$TestConversionStartTime,
-    [Parameter(Position = 9, ParameterSetName = "Default")]
+    [Parameter(Position = 9, ParameterSetName = "DefaultTestConversion")]
     [Parameter(Position = 10, ParameterSetName = "BurnInSubtitlesTestConversion")]
     [int]$TestConversionDuration
 )
