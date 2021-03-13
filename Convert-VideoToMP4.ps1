@@ -1,44 +1,28 @@
-[CmdletBinding(SupportsShouldProcess, DefaultParameterSetName = "Default")]
+[CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Position = 0, Mandatory, ParameterSetName = "Default")]
-    [Parameter(Position = 0, Mandatory, ParameterSetName = "BurnInSubtitles")]
-    [Parameter(Position = 0, Mandatory, ParameterSetName = "DefaultTestConversion")]
-    [Parameter(Position = 0, Mandatory, ParameterSetName = "BurnInSubtitlesTestConversion")]
+    [Parameter(Position = 0, Mandatory, ParameterSetName = "TestConversion")]
     [string[]]$VideoFile,
     [Parameter(Position = 1, Mandatory, ParameterSetName = "Default")]
-    [Parameter(Position = 1, Mandatory, ParameterSetName = "BurnInSubtitles")]
-    [Parameter(Position = 1, Mandatory, ParameterSetName = "DefaultTestConversion")]
-    [Parameter(Position = 1, Mandatory, ParameterSetName = "BurnInSubtitlesTestConversion")]
+    [Parameter(Position = 1, Mandatory, ParameterSetName = "TestConversion")]
     [string]$OutputDir,
     [Parameter(Position = 2, ParameterSetName = "Default")]
-    [Parameter(Position = 2, ParameterSetName = "BurnInSubtitles")]
-    [Parameter(Position = 2, ParameterSetName = "DefaultTestConversion")]
-    [Parameter(Position = 2, ParameterSetName = "BurnInSubtitlesTestConversion")]
+    [Parameter(Position = 2, ParameterSetName = "TestConversion")]
     [int]$VideoStream = 0,
     [Parameter(Position = 3, ParameterSetName = "Default")]
-    [Parameter(Position = 3, ParameterSetName = "BurnInSubtitles")]
-    [Parameter(Position = 3, ParameterSetName = "DefaultTestConversion")]
-    [Parameter(Position = 3, ParameterSetName = "BurnInSubtitlesTestConversion")]
+    [Parameter(Position = 3, ParameterSetName = "TestConversion")]
     [int]$AudioStream = 0,
     [Parameter(Position = 4, ParameterSetName = "Default")]
-    [Parameter(Position = 4, ParameterSetName = "BurnInSubtitles")]
-    [Parameter(Position = 4, ParameterSetName = "DefaultTestConversion")]
-    [Parameter(Position = 4, ParameterSetName = "BurnInSubtitlesTestConversion")]
-    [switch]$CopyAudioStream,
+    [Parameter(Position = 4, ParameterSetName = "TestConversion")]
+    [switch]$CopyAudioStream ,
     [Parameter(Position = 5, ParameterSetName = "Default")]
-    [Parameter(Position = 5, ParameterSetName = "BurnInSubtitles")]
-    [Parameter(Position = 5, ParameterSetName = "DefaultTestConversion")]
-    [Parameter(Position = 5, ParameterSetName = "BurnInSubtitlesTestConversion")]
+    [Parameter(Position = 5, ParameterSetName = "TestConversion")]
     [int]$AudioBitrateKb = 640,
     [Parameter(Position = 6, ParameterSetName = "Default")]
-    [Parameter(Position = 6, ParameterSetName = "BurnInSubtitles")]
-    [Parameter(Position = 6, ParameterSetName = "DefaultTestConversion")]
-    [Parameter(Position = 6, ParameterSetName = "BurnInSubtitlesTestConversion")]
+    [Parameter(Position = 6, ParameterSetName = "TestConversion")]
     [int]$VideoConstantRateFactor = 16,
     [Parameter(Position = 7, ParameterSetName = "Default")]
-    [Parameter(Position = 7, ParameterSetName = "BurnInSubtitles")]
-    [Parameter(Position = 7, ParameterSetName = "DefaultTestConversion")]
-    [Parameter(Position = 7, ParameterSetName = "BurnInSubtitlesTestConversion")]
+    [Parameter(Position = 7, ParameterSetName = "TestConversion")]
     [ValidateSet(
         "ultrafast",
         "superfast",
@@ -51,14 +35,20 @@ param(
         "veryslow"
     )]
     [string]$VideoEncodingSpeed = "medium",
-    [Parameter(Position = 8, ParameterSetName = "BurnInSubtitles")]
-    [Parameter(Position = 8, ParameterSetName = "BurnInSubtitlesTestConversion")]
-    [int]$SubtitleStream,
-    [Parameter(Position = 8, ParameterSetName = "DefaultTestConversion")]
-    [Parameter(Position = 9, ParameterSetName = "BurnInSubtitlesTestConversion")]
+    [Parameter(Position = 8, ParameterSetName = "Default")]
+    [Parameter(Position = 8, ParameterSetName = "TestConversion")]
+    [ValidateSet(
+        "None",
+        "Copy",
+        "BurnIn"
+    )]
+    [string]$SubtitlesMode = "None",
+    [Parameter(Position = 9, ParameterSetName = "Default")]
+    [Parameter(Position = 9, ParameterSetName = "TestConversion")]
+    [int]$SubtitleStream = 0,
+    [Parameter(Position = 10, Mandatory, ParameterSetName = "TestConversion")]
     [timespan]$TestConversionStartTime,
-    [Parameter(Position = 9, ParameterSetName = "DefaultTestConversion")]
-    [Parameter(Position = 10, ParameterSetName = "BurnInSubtitlesTestConversion")]
+    [Parameter(Position = 11, Mandatory, ParameterSetName = "TestConversion")]
     [int]$TestConversionDuration
 )
 
@@ -103,8 +93,8 @@ process {
         )
 
         #Determine if the parameter set is 'BurnInSubtitles' or 'Default'. Then add the necessary arguments to the list.
-        switch ($PSCmdlet.ParameterSetName) {
-            { $PSItem -in @("BurnInSubtitles", "BurnInSubtitlesTestConversion") } {
+        switch ($SubtitlesMode) {
+            "BurnIn" {
                 Write-Warning "Subtitles will be burned into the video stream."
                 $ffmpegArgs.AddRange(
                     [string[]]@(
@@ -114,6 +104,23 @@ process {
                         "-preset $($VideoEncodingSpeed)",
                         "-crf $($VideoConstantRateFactor)",
                         "-x265-params log-level=error"
+                        #"-profile:v main10"
+                    )
+                )
+                break
+            }
+
+            "Copy" {
+                Write-Warning "Subtitles will be copied into the video stream."
+                $ffmpegArgs.AddRange(
+                    [string[]]@(
+                        "-map $($VideoStream):v:0",
+                        "-c:v libx265",
+                        "-preset $($VideoEncodingSpeed)",
+                        "-crf $($VideoConstantRateFactor)",
+                        "-x265-params log-level=error",
+                        "-map $($SubtitleStream):s:0",
+                        "-c:s mov_text"
                         #"-profile:v main10"
                     )
                 )
@@ -138,7 +145,7 @@ process {
 
         #If 'TestConversionStartTime' and 'TestConversionDuration' are supplied, then only encode the specified timeframe.
         switch ($PSCmdlet.ParameterSetName) {
-            { $PSItem -in @("DefaultTestConversion", "BurnInSubtitlesTestConversion") } {
+            "TestConversion" {
                 Write-Warning "Conversion will only encode the specified timeframe."
                 $ffmpegArgs.AddRange(
                     [string[]]@(
