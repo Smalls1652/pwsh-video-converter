@@ -53,7 +53,10 @@ param(
 )
 
 process {
-    foreach ($videoFileItem in $VideoFile) { #Process through each input file provided
+    foreach ($videoFileItem in $VideoFile) {
+        #Process through each input file provided
+
+        $tempFiles = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
 
         #Try to resolve the path of the video file and the output directory. If resolving the path fails, then terminate the script.
         $videoFilePath = (Resolve-Path -Path $videoFileItem -ErrorAction "Stop").Path
@@ -77,6 +80,8 @@ process {
             }
         }
 
+        $videoInfo = ffprobe -loglevel error -hide_banner -i "$($videoFilePath)" -show_streams -print_format json | ConvertFrom-Json
+
         #Generate the file name of the output file and join it with the path to the output directory.
         $outputFilePath = Join-Path -Path $outputDirItem.FullName -ChildPath "$($videoFileItem.BaseName).mp4"
 
@@ -96,17 +101,58 @@ process {
         switch ($SubtitlesMode) {
             "BurnIn" {
                 Write-Warning "Subtitles will be burned into the video stream."
-                $ffmpegArgs.AddRange(
-                    [string[]]@(
-                        "-filter_complex `"[$($VideoStream):v:0][$($SubtitleStream):s:0]overlay[v]`"",
-                        "-map `"[v]`"",
-                        "-c:v libx265",
-                        "-preset $($VideoEncodingSpeed)",
-                        "-crf $($VideoConstantRateFactor)",
-                        "-x265-params log-level=error"
-                        #"-profile:v main10"
-                    )
-                )
+                $subtitleStreamInfo = ($videoInfo.streams | Where-Object { $PSItem.codec_type -eq "subtitle" })[$SubtitleStream]
+
+                switch ($subtitleStreamInfo.codec_name) {
+                    "ass" {
+                        Write-Warning "Subtitles are in the '.ass' format."
+
+                        $subtitleExtractArgs = [System.Collections.Generic.List[string]]::new(
+                            [string[]]@(
+                                "-hide_banner",
+                                "-v error",
+                                "-stats",
+                                "-i `"$($videoFileItem.FullName)`"",
+                                "-c:s:$($SubtitleStream) copy",
+                                "-y",
+                                "$($videoFileItem.BaseName).ass"
+                            )
+                        )
+
+                        Start-Process -FilePath "ffmpeg" -ArgumentList $subtitleExtractArgs -NoNewWindow -Wait
+
+                        $subtitleFileItem = Get-Item -Path "$($videoFileItem.BaseName).ass"
+                        $tempFiles.Add($subtitleFileItem)
+
+                        $ffmpegArgs.AddRange(
+                            [string[]]@(
+                                "-map $($VideoStream):v:0",
+                                "-c:v libx265",
+                                "-preset $($VideoEncodingSpeed)",
+                                "-crf $($VideoConstantRateFactor)",
+                                "-x265-params log-level=error",
+                                "-profile:v main10",
+                                "-vf `"subtitles='$($videoFileItem.BaseName).ass':stream_index=$($SubtitleStream)`""
+                            )
+                        )
+                        break
+                    }
+                
+                    Default {
+                        $ffmpegArgs.AddRange(
+                            [string[]]@(
+                                "-filter_complex `"[$($VideoStream):v:0][$($SubtitleStream):s:0]overlay[v]`"",
+                                "-map `"[v]`"",
+                                "-c:v libx265",
+                                "-preset $($VideoEncodingSpeed)",
+                                "-crf $($VideoConstantRateFactor)",
+                                "-x265-params log-level=error",
+                                "-profile:v main10"
+                            )
+                        )
+                        break
+                    }
+                }
                 break
             }
 
@@ -120,8 +166,8 @@ process {
                         "-crf $($VideoConstantRateFactor)",
                         "-x265-params log-level=error",
                         "-map $($SubtitleStream):s:0",
-                        "-c:s mov_text"
-                        #"-profile:v main10"
+                        "-c:s mov_text",
+                        "-profile:v main10"
                     )
                 )
                 break
@@ -135,8 +181,8 @@ process {
                         "-c:v libx265",
                         "-preset $($VideoEncodingSpeed)",
                         "-crf $($VideoConstantRateFactor)",
-                        "-x265-params log-level=error"
-                        #"-profile:v main10"
+                        "-x265-params log-level=error",
+                        "-profile:v main10"
                     )
                 )
                 break
@@ -204,6 +250,10 @@ process {
         #Begin the 'ffmpeg' process
         if ($PSCmdlet.ShouldProcess("ffmpeg $($ffmpegArgs -join " ")")) {
             Start-Process @ffmpegSplat
+        }
+
+        foreach ($tempItem in $tempFiles) {
+            Remove-Item -Path $tempItem.FullName -Force
         }
     }
 }
